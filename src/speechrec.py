@@ -3,19 +3,27 @@
 # Speech recognition and related audio utility functions
 # Requires Python modules SpeechRecognition, pyaudio
 
+import sys
 import speech_recognition as sr  
+
+def usage():
+
+	msg = "\n\tSpecify name of WAV audio file to be saved.\n" + \
+          "\n\tUsage: python speechrec.py filename.wav"
+
+	print(msg)
 
 def get_audio():
 
 	""" Prompt the user to speak a phrase into the microphone """
 
 	recognizer = sr.Recognizer()
-	r.pause_threshold = 0.8
+	recognizer.pause_threshold = 0.8
 
 	with sr.Microphone() as source:
-	    r.adjust_for_ambient_noise(source, duration = 1) 
+	    recognizer.adjust_for_ambient_noise(source, duration = 1) 
 	    print('\nSay something!')
-	    audio = r.listen(source, 5)
+	    audio = recognizer.listen(source, 5)
 	    print('Received audio, sending to Google...')
 
 	return audio, recognizer
@@ -45,6 +53,12 @@ def save_audio(audio, filename):
 
 if __name__=="__main__":
 
+	if len(sys.argv) < 2:
+		usage()
+		quit()
+
+	filename = sys.argv[1]
+
 	audio, recognizer = get_audio()
 	prediction = recognize(audio, recognizer)
-	save_audio(audio, "recording.wav")
+	save_audio(audio, filename)
