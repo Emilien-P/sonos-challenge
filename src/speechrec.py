@@ -32,6 +32,8 @@ def recognize(audio, recognizer):
 
 	""" Use Google speech recognition to attempt to recognize given audio data """
 
+	prediction = 'no prediction'
+
 	try:
 		prediction = recognizer.recognize_google(audio)
 	except sr.UnknownValueError:
@@ -40,6 +42,7 @@ def recognize(audio, recognizer):
 		print("Request Error; {0}".format(e))
 
 	print("Prediction: " + prediction)
+
 	return prediction
 
 def save_audio(audio, filename):
