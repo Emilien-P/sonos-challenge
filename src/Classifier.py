@@ -1,20 +1,27 @@
 import sklearn.svm as svm
 import sklearn.linear_model as lm
 import numpy as np
+from abc import ABC, abstractmethod, ABCMeta
 
-class SpeakerClassifier():
+from keras import Sequential
+from keras.layers import Dense, Activation
+
+
+class SpeakerClassifier:
     '''
     Attributes:
         method : String = classifier method to implement
     '''
+    __metaclass__ = ABCMeta
 
+    @abstractmethod
     def __init__(self, method="linSVM", feature_extraction=None):
         self.method = method
         self.feature_extraction = feature_extraction
-        if method == "linSVM":
-            self.model = svm.LinearSVC()
-        else: raise ValueError("The method {} of classifier if not recognized".format(method))
+        self.feature_coef_ = None
+        self.model = None
 
+    @abstractmethod
     def fit(self, x, y, sample_weight=None):
         '''
         Fit the training data x, y to the model.
@@ -25,16 +32,17 @@ class SpeakerClassifier():
         :return: None
         '''
 
+        x = np.asarray(x)
         if self.feature_extraction:
             if self.feature_extraction == "Lasso":
                 thresh = 0.01
-                #use Lasso regression to select useful features
-                x = np.asarray(x)
-                lasso_model = lm.Lasso(alpha=10)
+                # use Lasso regression to select useful features
+                lasso_model = lm.Lasso(alpha=0.1, copy_X=True, positive=True)
                 lasso_model.fit(x, y)
-                x = x[lasso_model.coef_ >= thresh]
+                self.feature_coef_ = lasso_model.coef_
+        else:
+            self.feature_coef_ = np.ones(x.shape[1])
 
-        self.model.fit(x, y, sample_weight)
 
     def predict(self, x):
         '''
@@ -46,3 +54,57 @@ class SpeakerClassifier():
         return self.model.predict(x)
 
 
+class MLClassifier(SpeakerClassifier):
+    '''
+    Classifier based on straight-forward ML implementations through scikit library
+    '''
+
+    def __init__(self, method="linSVM", feature_extraction=None):
+        super(MLClassifier, self).__init__(method, feature_extraction)
+        if method == "linSVM":
+            self.model = svm.LinearSVC()
+        else:
+            raise ValueError("The method {} of classifier if not recognized as ML method".format(method))
+
+    def fit(self, x, y, sample_weight=None):
+        super(MLClassifier, self).fit(x, y, sample_weight)
+        self.model.fit(np.apply_along_axis(lambda row: np.multiply(row, self.feature_coef_), arr=x, axis=1), y,
+                       sample_weight)
+
+class NNClassifier(SpeakerClassifier):
+    '''
+    Classifier based on Neural Network implementation through Keras library
+    '''
+
+    def __init__(self, method="linSVM", feature_extraction=None):
+        super(NNClassifier, self).__init__(method, feature_extraction)
+        if method == "seqNN":
+            self.model = Sequential()
+            self.compiled = False
+        else:
+            raise ValueError("The method {} of classifier if not recognized as NN method".format(method))
+
+    def addAndCompile(self, input_dim):
+        if self.method == "seqNN":
+            self.model.add(Dense(15, input_dim=input_dim))
+            self.model.add(Activation('relu'))
+
+            # One hidden layer
+            self.model.add(Dense(15))
+            self.model.add(Activation('relu'))
+
+            #output layer
+            self.model.add(Dense(10))
+            self.model.add(Activation('softmax'))
+
+            self.model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+            self.compiled = True
+
+    def fit(self, x, y, sample_weight=None):
+        assert self.compiled
+        super(NNClassifier, self).fit(x, y, sample_weight)
+        self.model.fit(np.apply_along_axis(lambda row: np.multiply(row, self.feature_coef_), arr=x, axis=1), y,
+                       sample_weight)
