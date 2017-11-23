@@ -13,15 +13,18 @@ def usage():
 
 	print(msg)
 
-def get_mfcc(filename):
+def get_mfcc(filename, verbose=False):
+	def print_if(string, verb):
+		if verb:
+			print(string)
 
 	""" Returns the MFCC of a given WAV file as a numpy array """
 
-	print('\nMFCC (Mel Frequency Cepstral Coefficients)\n' + div)
+	print_if('\nMFCC (Mel Frequency Cepstral Coefficients)\n' + div, verbose)
 
 	fs, signal = wav.read(filename)
 
-	print('File sampling frequency: ' + str(fs) + '\n')
+	print_if('File sampling frequency: ' + str(fs) + '\n', verbose)
 
 	mfcc = speechpy.mfcc(signal, 
 		                 sampling_frequency = fs, 
@@ -35,8 +38,9 @@ def get_mfcc(filename):
 	                     dc_elimination     = True)
 
 	mfcc_feature_cube = speechpy.extract_derivative_feature(mfcc)
-	print('MFCC - dimension: ', mfcc_feature_cube.shape)
-	print(mfcc)
+	if verbose:
+            print('MFCC - dimension: ', mfcc_feature_cube.shape)
+	print_if(mfcc, verbose)
 
 	return mfcc
 
