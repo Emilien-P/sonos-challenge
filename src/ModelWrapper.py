@@ -15,7 +15,7 @@ class ModelWrapper():
     train_data = np.empty((1, 50 * 12))
     train_labels = np.empty((1, 1))
 
-    def __init__(self, method="CNN", bootstrap="0", dirpath="users_data/", trunk="50"):
+    def __init__(self, method="linSVM", bootstrap="0", dirpath="users_data/", trunk="50"):
         if method == "linSVM":
             self.model = Cl.MLClassifier()
         elif method == "seqNN":
