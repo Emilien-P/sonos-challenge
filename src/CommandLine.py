@@ -15,10 +15,10 @@ class sonosShell(cmd.Cmd):
     def do_calibrate(self, arg):
         self.modelWrapper.calibrate(*parse(arg))
 
-    def do_compile(self):
+    def do_compile(self, arg):
         self.modelWrapper.compile_model()
 
-    def predict(self):
+    def do_predict(self, arg):
         print(self.modelWrapper.sample_and_predict())
 
 def parse(arg):

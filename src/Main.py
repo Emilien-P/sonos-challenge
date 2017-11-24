@@ -8,7 +8,7 @@ if __name__ == '__main__':
     # Test data
     # Take 10 samples of our database / speaker
 
-    wrapper = MW.ModelWrapper(method="linSVM")
+    wrapper = MW.ModelWrapper(method="seqNN")
 
     wrapper.calibrate("emilien", existing_samples=True)
 
