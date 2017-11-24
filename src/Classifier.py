@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod, ABCMeta
 from keras import Sequential
 from keras.layers import Dense, Activation, Conv2D, Flatten, Dropout
 
+#TODO: If the number of sample is not sufficient, Bootstrap the data
 
 class SpeakerClassifier:
     '''
@@ -105,10 +106,10 @@ class NNClassifier(SpeakerClassifier):
               loss='binary_crossentropy',
               metrics=['accuracy'])
         elif self.method == "CNN":
-            self.model.add(Conv2D(32, (2, 2), input_shape=input_dim))
+            self.model.add(Conv2D(64, (2, 2), input_shape=input_dim))
             self.model.add(Activation('relu'))
 
-            self.model.add(Conv2D(16, (2, 2)))
+            self.model.add(Conv2D(32, (2, 2)))
             self.model.add(Activation('relu'))
 
             self.model.add(Flatten())

@@ -55,7 +55,7 @@ class ValidationTester():
 
         return scores
 
-    def basicTest(self, dirpath="../resources/", n_samples=5):
+    def basicTest(self, dirpath="../resources/", n_samples=5, ratio_tt=1/10):
         trunk=50
         arr1 = [
             (mf.get_mfcc(dirpath+"cmu_us_awb_arctic/wav/arctic_a{:0>4}.wav".format(i + 1))[:trunk, 1:]).flatten()
@@ -67,7 +67,7 @@ class ValidationTester():
         speaker1 = np.array(arr1, dtype=np.float64)
         speaker2 = np.array(arr2, dtype=np.float64)
 
-        split = 200
+        split = int(n_samples * ratio_tt)
 
         trainData = np.concatenate((speaker1[:split], speaker2[:split]))
         testData = np.concatenate((speaker1[split:], speaker2[split:]))
@@ -78,16 +78,14 @@ class ValidationTester():
             self.model.fit(trainData, trainlabels)
             return self.model.predict(testData)
         elif isinstance(self.model, NNClassifier):
-            #TODO : REDO THE LABELLING WHICH IS WRONG!!!!!!
-            trainlabels = np.concatenate((np.tile([1, 0], (1, split)), np.tile([0, 1], (1, split))), axis=0).T
-            testlabels = np.concatenate((np.tile([1, 0], (1, n_samples -split)), np.tile([0, 1], (1, n_samples - split))), axis=0).T
+            trainlabels = np.concatenate((np.tile([1, 0], (split, 1)), np.tile([0, 1], (split, 1))), axis=0)
+            testlabels = np.concatenate((np.tile([1, 0], (n_samples -split, 1)), np.tile([0, 1], (n_samples - split, 1))), axis=0)
             if self.model.method == "CNN":
-                print("reshape of input")
                 trainData = np.apply_along_axis(lambda matrix: matrix.reshape(50, 12, 1), arr=trainData, axis=1)
                 testData = np.apply_along_axis(lambda matrix: matrix.reshape(50, 12, 1), arr=testData, axis=1)
 
             his = self.model.model.fit(trainData, trainlabels, epochs=10, verbose=1)
-            scores = self.model.model.predict(testData, verbose=1)
+            scores = self.model.model.evaluate(testData, testlabels, verbose=1)
         else:
             raise ValueError("The model is not recognized")
 

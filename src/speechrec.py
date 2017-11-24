@@ -13,6 +13,11 @@ def usage():
 
 	print(msg)
 
+
+def get_one_sample(file_name):
+	audio, recognizer = get_audio()
+	save_audio(audio, file_name)
+
 def get_audio():
 
 	""" Prompt the user to speak a phrase into the microphone """
@@ -28,7 +33,7 @@ def get_audio():
 
 	return audio, recognizer
 
-def recognize(audio, recognizer):
+def recognize(audio, recognizer, return_audio=False):
 
 	""" Use Google speech recognition to attempt to recognize given audio data """
 
@@ -43,7 +48,10 @@ def recognize(audio, recognizer):
 
 	print("Prediction: " + prediction)
 
-	return prediction
+	if return_audio:
+		return audio, prediction
+	else:
+		return prediction
 
 def save_audio(audio, filename):
 

@@ -9,16 +9,17 @@ if __name__ == '__main__':
 
     model = Cl.MLClassifier()
     tester = Vt.ValidationTester(model)
+    n_sample=50
 
-    print(tester.basicTest(n_samples=250))
+    print(tester.basicTest(n_samples=n_sample))
 
     model = Cl.NNClassifier(method="seqNN")
     model.addAndCompile(50 * 12)
     tester = Vt.ValidationTester(model)
-    print(tester.basicTest(n_samples=250))
+    print(tester.basicTest(n_samples=n_sample))
 
 
     model = Cl.NNClassifier(method="CNN")
     model.addAndCompile((50, 12, 1))
     tester = Vt.ValidationTester(model)
-    print(tester.basicTest(n_samples=250))
+    print(tester.basicTest(n_samples=n_sample))
