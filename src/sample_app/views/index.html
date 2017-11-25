@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Sonos Javascript Sample</title>
+    <link rel="stylesheet" type="text/css" href="../stylesheets/style.css">
+    <link rel="stylesheet" type="text/css" href="../stylesheets/simple-slider-volume.css">
+    <script src="http://code.jquery.com/jquery-2.1.4.js" onload="window.$ = window.jQuery = module.exports;"></script>
+  </head>
+  <body>
+    <div>
+      <img id="cover-art"/>
+      <div id="control-content" class="disconnected">
+        <div id="group-panel">
+          <div id="group-name">Select A Group</div>
+        </div>
+        <div id="group-list"></div>
+      <div id="control-panel">
+        <div id="current-metadata">
+          <div class="current song"></div>
+          <div class="current artist"></div>
+        </div>
+        <div id="play-controls">
+          <div class="previous control button"></div>
+          <div class="play control button"></div>
+          <div class="session control button"></div>
+          <div class="next control button"></div>
+          <div id="volume">
+            <div class="control">
+              <input title="Volume" type="text" data-slider="true" data-slider-range="0,100" data-slider-step="1" data-slider-theme="volume" data-slider-buffer-millis="200"/>
+            </div>
+          </div>
+        </div>
+        <div id="nextup-metadata">
+          <span id="nextup-title">Next Up</span>
+          <div class="nextup song"></div>
+          <div class="nextup artist"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+  <script src="../javascripts/simple-slider.js"></script>
+  <script src="index.js"></script>
+</html>
