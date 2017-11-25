@@ -1,7 +1,7 @@
-import src.Classifier as Cl
-import src.speechrec as sprec
+import Classifier as Cl
+import speechrec as sprec
 import numpy as np
-import src.mfcc as mf
+import mfcc as mf
 import json
 
 class ModelWrapper():

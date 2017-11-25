@@ -1,6 +1,6 @@
-import src.Classifier as Cl
+import Classifier as Cl
 import cmd, readline
-import src.ModelWrapper as MW
+import ModelWrapper as MW
 
 
 class sonosShell(cmd.Cmd):
