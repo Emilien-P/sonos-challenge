@@ -1,5 +1,5 @@
 import Classifier as Cl
-import cmd, readline
+import cmd, readline, socket
 import ModelWrapper as MW
 
 
@@ -7,6 +7,7 @@ class sonosShell(cmd.Cmd):
     nb_sample = 0
     modelWrapper = None
     initialized = False
+    sock = None
 
     def do_initialize_model(self, arg):
         self.modelWrapper = MW.ModelWrapper(*parse(arg))
@@ -19,7 +20,9 @@ class sonosShell(cmd.Cmd):
         self.modelWrapper.compile_model()
 
     def do_predict(self, arg):
-        print(self.modelWrapper.sample_and_predict())
+        name, command = self.modelWrapper.sample_and_predict()
+
+
 
 def parse(arg):
     'Convert a series of zero or more argument to an argument tuple'

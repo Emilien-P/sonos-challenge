@@ -23,7 +23,7 @@ def get_audio():
 	""" Prompt the user to speak a phrase into the microphone """
 
 	recognizer = sr.Recognizer()
-	recognizer.pause_threshold = 0.8
+	recognizer.pause_threshold = 0.5
 
 	with sr.Microphone() as source:
 	    recognizer.adjust_for_ambient_noise(source, duration = 1) 

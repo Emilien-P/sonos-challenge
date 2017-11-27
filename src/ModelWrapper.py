@@ -1,4 +1,4 @@
-import Classifier as Cl
+import src.Classifier as Cl
 import speechrec as sprec
 import numpy as np
 import mfcc as mf
@@ -44,7 +44,7 @@ class ModelWrapper():
 
         # update the number of users we have
         self.nb_users += 1
-        self.users_map.update({self.nb_users : user_name})
+        self.users_map.update({self.nb_users - 1 : user_name})
 
         nb_calibrations = int(nb_calibrations)
         trunk = self.trunk
@@ -59,14 +59,12 @@ class ModelWrapper():
                                       [:trunk, 1:]).flatten() for i in range(nb_calibrations)]
 
             self.train_data = np.concatenate((self.train_data, np.asarray(user_calibration_data)), axis=0)
-
-            if isinstance(self.model, Cl.MLClassifier):
-                self.train_labels = np.concatenate((self.train_labels, np.tile([self.nb_users], (nb_calibrations, 1))))
-            elif isinstance(self.model, Cl.NNClassifier):
-                # TODO: implement
-                pass
+            self.train_labels = np.concatenate((self.train_labels, np.tile([self.nb_users - 1], (nb_calibrations, 1))))
 
         else:
+            for i in range(nb_calibrations):
+                mfcc = (mf.get_mfcc(self.dirpath + user_name + "{:0>4}.wav".format(i))
+                                      [:trunk, 1:])
             raise ValueError("Bootstrapping not implemented yet")
 
     def compile_model(self):
@@ -74,7 +72,12 @@ class ModelWrapper():
         Fit the training data to the wrapped model
         :return: None
         '''
-        self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None)
+        if isinstance(self.model, Cl.NNClassifier):
+            self.model.addAndCompile((50, 12, 1), self.nb_users)
+            #drop the first one which is a zero
+            self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None, num_class=self.nb_users)
+        else:
+            self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None)
 
     def sample_and_predict(self):
         '''
@@ -91,9 +94,9 @@ class ModelWrapper():
         '''
 
         #TODO: prepare data for CNN if needed, modulize those predict methods
-        pred_data = [(mf.get_mfcc(self.dirpath+file_name)[:self.trunk, 1:]).flatten()]
+        pred_data = (mf.get_mfcc(self.dirpath+file_name)[:self.trunk, 1:])
         prediction = self.model.predict(pred_data)
-        prediction = self.users_map[int(prediction[0])]
+        prediction = self.users_map[int(prediction)]
 
         answ = {"user_prediction" : prediction}
 
@@ -110,4 +113,4 @@ class ModelWrapper():
         answ = {"user_prediction" : prediction,
                 "google_sentence_prediction" : google_pred}
 
-        return json.dumps(answ)
+        return prediction, google_pred
