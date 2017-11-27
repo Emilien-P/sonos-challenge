@@ -64,8 +64,14 @@ class ModelWrapper():
         else:
             for i in range(nb_calibrations):
                 mfcc = (mf.get_mfcc(self.dirpath + user_name + "{:0>4}.wav".format(i))
-                                      [:trunk, 1:])
-            raise ValueError("Bootstrapping not implemented yet")
+                                      [:, 1:])
+                n_timedomain = mfcc.shape[0]
+                nb_bootstrap = n_timedomain - self.trunk
+                assert nb_bootstrap > 0
+                cal_data = [mfcc[j: j+self.trunk].flatten() for j in range(nb_bootstrap)]
+                self.train_data = np.concatenate((self.train_data, np.asarray(cal_data)), axis=0)
+                self.train_labels = np.concatenate(
+                    (self.train_labels, np.tile([self.nb_users - 1], (nb_bootstrap, 1))))
 
     def compile_model(self):
         '''
