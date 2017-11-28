@@ -5,6 +5,7 @@ import numpy as np
 from abc import ABC, abstractmethod, ABCMeta
 
 from keras import Sequential
+from keras import utils
 from keras.layers import Dense, Activation, Conv2D, Flatten, Dropout
 
 #TODO: If the number of sample is not sufficient, Bootstrap the data
@@ -73,6 +74,10 @@ class MLClassifier(SpeakerClassifier):
         self.model.fit(np.apply_along_axis(lambda row: np.multiply(row, self.feature_coef_), arr=x, axis=1), y,
                        sample_weight)
 
+    def predict(self, x):
+        x = [x.flatten()]
+        return super().predict(x)
+
 class NNClassifier(SpeakerClassifier):
     '''
     Classifier based on Neural Network implementation through Keras library
@@ -90,8 +95,10 @@ class NNClassifier(SpeakerClassifier):
         else:
             raise ValueError("The method {} of classifier if not recognized as NN method".format(method))
 
-    def addAndCompile(self, input_dim):
+    def addAndCompile(self, input_dim, n_users=2):
+        assert(n_users < 33)
         if self.method == "seqNN":
+            input_dim = input_dim[0] * input_dim[1]
             self.model.add(Dense(64, input_dim=input_dim))
             self.model.add(Activation('relu'))
 
@@ -99,12 +106,12 @@ class NNClassifier(SpeakerClassifier):
             self.model.add(Activation('relu'))
 
             #output layer
-            self.model.add(Dense(2))
+            self.model.add(Dense(n_users))
             self.model.add(Activation('softmax'))
 
 
             self.model.compile(optimizer='adam',
-              loss='binary_crossentropy',
+              loss='categorical_crossentropy',
               metrics=['accuracy'])
         elif self.method == "CNN":
             self.model.add(Conv2D(64, (2, 2), input_shape=input_dim))
@@ -114,17 +121,24 @@ class NNClassifier(SpeakerClassifier):
             self.model.add(Activation('relu'))
 
             self.model.add(Flatten())
-            self.model.add(Dense(2))
+            self.model.add(Dense(n_users))
             self.model.add(Activation('softmax'))
 
             self.model.compile(optimizer='adam',
-              loss='binary_crossentropy',
+              loss='categorical_crossentropy',
               metrics=['accuracy'])
 
         self.compiled = True
 
-    def fit(self, x, y, sample_weight=None):
+    def fit(self, x, y, sample_weight=None, num_class=None):
         assert self.compiled
+        y = utils.to_categorical(y, num_classes=num_class)
         super(NNClassifier, self).fit(x, y, sample_weight)
         self.history = self.model.fit(np.apply_along_axis(lambda row: np.multiply(row, self.feature_coef_), arr=x,
                                                           axis=1), y, sample_weight)
+
+    def predict(self, x):
+        if self.method == "seqNN":
+            x = x.reshape((1, 600))
+        idx = np.argmax(super().predict(x))
+        return idx
