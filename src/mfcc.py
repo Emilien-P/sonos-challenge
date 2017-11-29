@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+from __future__ import division
 import numpy as np
 import speechpy, sys
 import scipy.io.wavfile as wav
 from noisereduction import reduce_noise
+import matplotlib.pyplot as plt
 
 div = '='*70 + '\n'
 
@@ -14,18 +16,26 @@ def usage():
 
 	print(msg)
 
-def get_mfcc(filename, noisereduction=True, normalizemean=False, numcoeff=13, verbose=False):
+def get_mfcc(filename, delta=False, noisereduction=True, normalizemean=False, numcoeff=13, verbose=False):
 
 	def print_if(string, verb):
 		if verb:
 			print(string)
 
-	""" Returns the MFCC of a given WAV file as a numpy array """
+	""" Returns the MFCC of a given WAV file as a numpy array. Options include:
+		delta:          append delta (velocity) features to MFCC; doubles # features per frame
+		noisereduction: apply noise reduction before computing MFCC
+		normalizemean:  output MFCC as normalized global mean - mutually exclusive from delta
+		numcoeff:       specify number of cepstral coefficients; usually scaled linearly with sampling rate
+		verbose:        enable detailed print statements
+
+	"""
 
 	# Perform noise reduction before calculating coefficients
 	if noisereduction:
 		print_if('Noise Reduction On', verbose)
 		fs, signal = reduce_noise(filename)
+
 	else:
 		print_if('Noise Reduction Off', verbose)
 		fs, signal = wav.read(filename)
@@ -37,7 +47,7 @@ def get_mfcc(filename, noisereduction=True, normalizemean=False, numcoeff=13, ve
 	mfcc = speechpy.mfcc(signal, 
 		                 sampling_frequency = fs, 
 		                 frame_length       = 0.020, 
-		                 frame_stride       = 0.01,
+		                 frame_stride       = 0.020,    # Frame overlap amount (0.02 is no overlap)
 		                 num_cepstral       = numcoeff, # Default 13; scale with sample rate
 	                     num_filters        = 40, 
 	                     fft_length         = 512, 
@@ -45,16 +55,82 @@ def get_mfcc(filename, noisereduction=True, normalizemean=False, numcoeff=13, ve
 	                     high_frequency     = None,
 	                     dc_elimination     = True)
 
-	mfcc_feature_cube = speechpy.extract_derivative_feature(mfcc)
-	if verbose:
-            print('MFCC - dimension: ', mfcc_feature_cube.shape)
+	mfcc_feature_cube        = speechpy.extract_derivative_feature(mfcc)
+	length, numfeatures, dim = mfcc_feature_cube.shape
+
+	print_if('MFCC dimension: ' + str(mfcc_feature_cube.shape), verbose) 
 	print_if(mfcc, verbose)
+
+	if delta:
+		delta_features = get_delta(mfcc)
+		mfcc_delta = np.empty((length, numfeatures*2))
+
+		for i in range(len(mfcc)):
+			mfcc_delta[i] = np.concatenate([mfcc[i], delta_features[i]])
+
+		mfcc_delta_feature_cube = speechpy.extract_derivative_feature(mfcc_delta)
+		print_if('\nMFCC with Delta dimension: ' + str(mfcc_delta_feature_cube.shape), verbose)
+		print_if(mfcc_delta, verbose)
+
+		return mfcc_delta
 
 	# Option to return normalized cepstral mean (for each set of coeffs, subtracts mean from each coeff)
 	if normalizemean:
-		return speechpy.cmvn(mfcc, variance_normalization=False)
+		mfcc_normalizedmean = speechpy.cmvn(mfcc, variance_normalization=False)
+
+		mfcc_normalizedmean_feature_cube = speechpy.extract_derivative_feature(mfcc_normalizedmean)
+		print_if('\nMFCC with normalized mean dimension: ' + str(mfcc_normalizedmean_feature_cube.shape), verbose)
+		print_if(mfcc_normalizedmean, verbose)
+
+		return mfcc_normalizedmean
 
 	return mfcc
+
+def get_fft(filename, noisereduction=True):
+
+	""" Returns FFT frequencies, power of input WAV file """
+
+	# Perform noise reduction before calculating coefficients
+	if noisereduction:
+		print('Noise Reduction On')
+		fs, signal = reduce_noise(filename)
+	else:
+		print('Noise Reduction Off')
+		fs, signal = wav.read(filename)
+
+	ps = np.abs(np.fft.fft(signal))**2
+	print('FFT Power Spectrum')
+	print(len(ps))
+	print(ps)
+
+	time_step = 1/fs
+	freqs = np.fft.fftfreq(signal.size, time_step)
+	print('Frequencies')
+	print(freqs)
+	print(len(freqs))
+	#freqs = freqs[round(len(freqs)/2):]
+	idx = np.argsort(freqs)
+
+	plt.plot(freqs[idx], ps[idx])
+	plt.show()
+
+	return freqs[idx], ps[idx]
+
+def get_delta(feat, N=1):
+
+    """ Return delta features of given MFCC, N = # of deltas."""
+
+    if N < 1:
+        raise ValueError('N must be an integer >= 1')
+    NUMFRAMES = len(feat)
+    denominator = 2 * sum([i**2 for i in range(1, N+1)])
+    delta_feat = np.empty_like(feat)
+    padded = np.pad(feat, ((N, N), (0, 0)), mode='edge')
+    for t in range(NUMFRAMES):
+    	# [t : t+2*N+1] == [(N+t)-N : (N+t)+N+1]
+        delta_feat[t] = np.dot(np.arange(-N, N+1), padded[t : t+2*N+1]) / denominator
+
+    return delta_feat
 
 def get_mfe(filename):
 
@@ -91,5 +167,6 @@ if __name__=="__main__":
 
 	filename = sys.argv[1]
 
-	get_mfcc(filename, verbose=True)
-	get_mfe(filename)
+	get_mfcc(filename, delta=True, verbose=True)
+	# get_mfe(filename)
+	# get_fft(filename)

@@ -1,7 +1,4 @@
-#!/usr/bin/env python35
-
-#from pydub import AudioSegment
-#import soundfile as sf
+#!/usr/bin/env python3
 
 import wave, sys
 import numpy as np
@@ -101,10 +98,10 @@ def firpm(inputfile, output="firpm_output.wav", plot=False):
     input.close()
 
     # Band-pass filter design parameters
-    nyq = sampleRate/2 # Nyquist sample rate, Hz
-    band = [300, 3000]  # Desired pass band, Hz
-    trans_width = 250   # Pass band transition, Hz
-    numtaps = 125      # Size of the FIR filter
+    nyq         = sampleRate/2 # Nyquist sample rate, Hz
+    band        = [300, 3000]  # Desired pass band, Hz; recommended [300, 3000]
+    trans_width = 250          # Pass band transition, Hz; recommended 250
+    numtaps     = 125          # Size of the FIR filter
 
     edges = [0, band[0] - trans_width,
              band[0], band[1],

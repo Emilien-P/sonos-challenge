@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 # Speech recognition and related audio utility functions
-# Requires Python modules SpeechRecognition, pyaudio
+# Requires Python modules playsound, SpeechRecognition, pyaudio
 
-import sys
+import sys, playsound
 import speech_recognition as sr  
 
 def usage():
@@ -27,6 +27,7 @@ def get_audio():
 
 	with sr.Microphone() as source:
 	    recognizer.adjust_for_ambient_noise(source, duration = 1) 
+	    playsound.playsound('ding.wav', True)
 	    print('\nSay something!')
 	    audio = recognizer.listen(source, 5)
 	    print('Received audio, sending to Google...')
