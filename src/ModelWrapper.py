@@ -1,5 +1,7 @@
 import src.Classifier as Cl
 import speechrec as sprec
+from sklearn.metrics import accuracy_score, hamming_loss
+from keras import utils
 import numpy as np
 import mfcc as mf
 import json
@@ -12,16 +14,17 @@ class ModelWrapper():
     nb_users = 0
     users_map = {}
     bootstrap = False
-    train_data = np.empty((1, 50 * 12))
     train_labels = np.empty((1, 1))
 
-    def __init__(self, method="linSVM", bootstrap="0", dirpath="users_data/", trunk="50"):
+    def __init__(self, method="linSVM", bootstrap="1", dirpath="users_data/", trunk="100"):
         if method == "linSVM":
             self.model = Cl.MLClassifier()
         elif method == "seqNN":
             self.model = Cl.NNClassifier()
         elif method == "CNN":
             self.model = Cl.NNClassifier("CNN")
+        elif method == "LSTM":
+            self.model = Cl.NNClassifier("LSTM")
         else:
             raise ValueError("Method not recognized")
 
@@ -29,10 +32,13 @@ class ModelWrapper():
             self.bootstrap = True
 
         self.dirpath = dirpath
-
+        number_feature = 12
+        self.train_data = np.empty((1, int(trunk), number_feature))
+        self.test_data = np.empty((1, int(trunk), number_feature))
+        self.test_labels = np.empty((1, 1))
         self.trunk = int(trunk)
 
-    def calibrate(self, user_name, nb_calibrations="5", existing_samples=False):
+    def calibrate(self, user_name, nb_calibrations="5", nb_tests="5", existing_samples=False):
         '''
         Calibrate for a new user of the speaker recognition system
         :param user_name: The name of the user
@@ -47,43 +53,80 @@ class ModelWrapper():
         self.users_map.update({self.nb_users - 1 : user_name})
 
         nb_calibrations = int(nb_calibrations)
+        nb_tests = int(nb_tests)
         trunk = self.trunk
 
-        if not existing_samples:
+        if existing_samples == "0":
+            print("Recording the calibration samples")
             for i in range(nb_calibrations):
-                sprec.get_one_sample(self.dirpath+user_name+"{:0>4}.wav".format(i))
+                sprec.get_one_sample(self.dirpath+user_name.lower()+"{:0>4}.wav".format(i + 1))
 
         if not self.bootstrap:
             # Drop after trunk in the time domain as well as the first mel coef
-            user_calibration_data = [(mf.get_mfcc(self.dirpath + user_name + "{:0>4}.wav".format(i))
-                                      [:trunk, 1:]).flatten() for i in range(nb_calibrations)]
+            user_calibration_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
+                                      [:trunk, 1:]) for i in range(nb_calibrations)]
 
             self.train_data = np.concatenate((self.train_data, np.asarray(user_calibration_data)), axis=0)
             self.train_labels = np.concatenate((self.train_labels, np.tile([self.nb_users - 1], (nb_calibrations, 1))))
 
         else:
-            for i in range(nb_calibrations):
-                mfcc = (mf.get_mfcc(self.dirpath + user_name + "{:0>4}.wav".format(i))
+            print("Bootstrapping")
+            '''for i in range(nb_calibrations):
+                mfcc = (mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
                                       [:, 1:])
                 n_timedomain = mfcc.shape[0]
                 nb_bootstrap = n_timedomain - self.trunk
                 assert nb_bootstrap > 0
-                cal_data = [mfcc[j: j+self.trunk].flatten() for j in range(nb_bootstrap)]
+                #TODO: TRY A NEW WAY OF BOOTSTRAPPING
+                cal_data = [mfcc[j: j+self.trunk] for j in range(nb_bootstrap)]
                 self.train_data = np.concatenate((self.train_data, np.asarray(cal_data)), axis=0)
                 self.train_labels = np.concatenate(
-                    (self.train_labels, np.tile([self.nb_users - 1], (nb_bootstrap, 1))))
+                    (self.train_labels, np.tile([self.nb_users - 1], (nb_bootstrap, 1))))'''
 
-    def compile_model(self):
+            for i in range(nb_calibrations):
+                mfcc = (mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
+                        [:, 1:])
+                n_timedomain = mfcc.shape[0]
+                nb_bootstrap = n_timedomain - self.trunk
+                step = 25
+                assert nb_bootstrap > 0
+                cal_data = [mfcc[j: j + self.trunk] for j in np.arange(0, nb_bootstrap, step)]
+                self.train_data = np.concatenate((self.train_data, np.asarray(cal_data)), axis=0)
+                self.train_labels = np.concatenate(
+                    (self.train_labels, np.tile([self.nb_users - 1], (np.arange(0, nb_bootstrap, step).shape[0], 1))))
+
+        if(nb_tests > 0):
+            # Drop after trunk in the time domain as well as the first mel coef
+            user_testing_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
+                                      [:trunk, 1:]) for i in range(nb_calibrations, nb_tests + nb_calibrations)]
+
+            self.test_data = np.concatenate((self.test_data, np.asarray(user_testing_data)), axis=0)
+            self.test_labels = np.concatenate((self.test_labels, np.tile([self.nb_users - 1], (nb_tests, 1))))
+
+
+    def compile_model(self, val_split=0, val_data=False):
         '''
         Fit the training data to the wrapped model
         :return: None
         '''
         if isinstance(self.model, Cl.NNClassifier):
-            self.model.addAndCompile((50, 12, 1), self.nb_users)
+            self.model.addAndCompile((self.trunk, 12, 1), self.nb_users)
             #drop the first one which is a zero
-            self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None, num_class=self.nb_users)
+            if val_data:
+                his = self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None,
+                                     num_class=self.nb_users, val_split=val_split,
+                                     val_data=(self.test_data[1:],
+                                               utils.to_categorical(self.test_labels[1:], num_classes=self.nb_users)))
+            else:
+                his = self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None,
+                                     num_class=self.nb_users, val_split=val_split)
+            return his
         else:
-            self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None)
+            if val_data:
+                nb_tests = self.test_data.shape[0] - 1
+                self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None)
+                predictions = self.model.model.predict(self.test_data[1:].reshape(nb_tests, -1))
+                return accuracy_score(self.test_labels[1:], predictions), hamming_loss(self.test_labels[1:], predictions)
 
     def sample_and_predict(self):
         '''
@@ -114,7 +157,7 @@ class ModelWrapper():
         pred_data = mf.get_mfcc(self.dirpath+"sample_to_recognize.wav")[:self.trunk, 1:]
 
         prediction = self.model.predict(pred_data)
-        prediction = self.users_map[prediction[0]]
+        prediction = self.users_map[prediction]
 
         answ = {"user_prediction" : prediction,
                 "google_sentence_prediction" : google_pred}

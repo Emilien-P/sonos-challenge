@@ -48,10 +48,8 @@ if __name__ == "__main__":
         print(args)
         if command == "initialize":
             serv = MyServer(args)
-            sock.sendall(("OK" + "\n").encode())
         elif command == "calibrate":
             serv.do_calibrate(args)
-            sock.sendall(("OK" + "\n").encode())
         elif command == "listen":
             if not compiled:
                 serv.do_compile(args)

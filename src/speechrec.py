@@ -59,7 +59,7 @@ def save_audio(audio, filename):
 
 	with open(filename, "wb") as f:
 		f.write(audio.get_wav_data())
-
+	f.close()
 	return
 
 if __name__=="__main__":

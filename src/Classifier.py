@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod, ABCMeta
 
 from keras import Sequential
 from keras import utils
-from keras.layers import Dense, Activation, Conv2D, Flatten, Dropout
+from keras.layers import Dense, Activation, Conv2D, Flatten, Dropout, LSTM
+from keras.callbacks import EarlyStopping
 
-#TODO: If the number of sample is not sufficient, Bootstrap the data
 
 class SpeakerClassifier:
     '''
@@ -71,8 +71,9 @@ class MLClassifier(SpeakerClassifier):
 
     def fit(self, x, y, sample_weight=None):
         super(MLClassifier, self).fit(x, y, sample_weight)
-        self.model.fit(np.apply_along_axis(lambda row: np.multiply(row, self.feature_coef_), arr=x, axis=1), y,
-                       sample_weight)
+        nb_samples = x.shape[0]
+        x = x.reshape(nb_samples, -1)
+        self.model.fit(x, y, sample_weight)
 
     def predict(self, x):
         x = [x.flatten()]
@@ -86,10 +87,7 @@ class NNClassifier(SpeakerClassifier):
     def __init__(self, method="seqNN", feature_extraction=None):
         super(NNClassifier, self).__init__(method, feature_extraction)
         self.history = None
-        if method == "seqNN":
-            self.model = Sequential()
-            self.compiled = False
-        elif method == "CNN":
+        if method in ["seqNN", "CNN", "LSTM"]:
             self.model = Sequential()
             self.compiled = False
         else:
@@ -102,8 +100,12 @@ class NNClassifier(SpeakerClassifier):
             self.model.add(Dense(64, input_dim=input_dim))
             self.model.add(Activation('relu'))
 
+            self.model.add(Dropout(0.25))
+
             self.model.add(Dense(64))
             self.model.add(Activation('relu'))
+
+            self.model.add(Dropout(0.25))
 
             #output layer
             self.model.add(Dense(n_users))
@@ -114,13 +116,50 @@ class NNClassifier(SpeakerClassifier):
               loss='categorical_crossentropy',
               metrics=['accuracy'])
         elif self.method == "CNN":
-            self.model.add(Conv2D(64, (2, 2), input_shape=input_dim))
+            self.model.add(Conv2D(32, (2, 2), input_shape=input_dim))
             self.model.add(Activation('relu'))
 
-            self.model.add(Conv2D(32, (2, 2)))
+            self.model.add(Dropout(0.25))
+
+            self.model.add(Conv2D(16, (2, 2)))
             self.model.add(Activation('relu'))
+
+            self.model.add(Dropout(0.25))
 
             self.model.add(Flatten())
+            self.model.add(Dense(n_users))
+            self.model.add(Activation('softmax'))
+
+            self.model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+        elif self.method == "CNN":
+            self.model.add(Conv2D(32, (2, 2), input_shape=input_dim))
+            self.model.add(Activation('relu'))
+
+            self.model.add(Dropout(0.25))
+
+            self.model.add(Conv2D(16, (2, 2)))
+            self.model.add(Activation('relu'))
+
+            self.model.add(Dropout(0.25))
+
+            self.model.add(Flatten())
+            self.model.add(Dense(n_users))
+            self.model.add(Activation('softmax'))
+
+            self.model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+        elif self.method == "LSTM":
+            input_dim = (input_dim[0], input_dim[1])
+            #TODO: REGENERATE WITH OTHER IMPLEMENTATION
+            '''self.model.add(LSTM(64, return_sequences=True, input_shape=input_dim))
+            self.model.add(LSTM(64, return_sequences=True))
+            self.model.add(LSTM(64, return_sequences=False))'''
+            self.model.add(LSTM(128, return_sequences=False, input_shape=input_dim))
+            self.model.add(Dropout(0.25))
+
             self.model.add(Dense(n_users))
             self.model.add(Activation('softmax'))
 
@@ -130,15 +169,31 @@ class NNClassifier(SpeakerClassifier):
 
         self.compiled = True
 
-    def fit(self, x, y, sample_weight=None, num_class=None):
+    def fit(self, x, y, sample_weight=None, num_class=None, val_split=0, val_data=None):
         assert self.compiled
         y = utils.to_categorical(y, num_classes=num_class)
         super(NNClassifier, self).fit(x, y, sample_weight)
-        self.history = self.model.fit(np.apply_along_axis(lambda row: np.multiply(row, self.feature_coef_), arr=x,
-                                                          axis=1), y, sample_weight)
+        if self.method == "seqNN":
+            nb_samples = x.shape[0]
+            x = x.reshape(nb_samples, -1)
+            if val_data:
+                val_data = (val_data[0].reshape(val_data[0].shape[0], -1), val_data[1])
+        elif self.method == "CNN":
+            x = x[:, :, :, np.newaxis]
+            if val_data:
+                val_data = (val_data[0][:, :, :, np.newaxis], val_data[1])
+        self.history = self.model.fit(x, y, sample_weight, validation_split=val_split, validation_data=val_data,
+                                      epochs=10) # callbacks=[EarlyStopping(monitor='val_loss')]
+        return self.history
 
     def predict(self, x):
         if self.method == "seqNN":
-            x = x.reshape((1, 600))
+            n = x.shape[0] * x.shape[1]
+            x = x.reshape((1, n))
+        elif self.method == "CNN":
+            x = x[np.newaxis, :, :, np.newaxis]
+        elif self.method == "LSTM":
+            x = x[np.newaxis, :, :]
+        print(super().predict(x))
         idx = np.argmax(super().predict(x))
         return idx
