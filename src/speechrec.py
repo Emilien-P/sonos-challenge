@@ -29,7 +29,8 @@ def get_audio():
 	    recognizer.adjust_for_ambient_noise(source, duration = 1) 
 	    playsound.playsound('ding.wav', True)
 	    print('\nSay something!')
-	    audio = recognizer.listen(source, 5)
+	    #audio = recognizer.listen(source, 5)
+	    audio = recognizer.record(source, duration=5)
 	    print('Received audio, sending to Google...')
 
 	return audio, recognizer
