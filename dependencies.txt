@@ -1,0 +1,20 @@
+Requires the following packages.
+
+
+1. Python packages
+Install each by running the following command in any cmd prompt:
+
+	pip install <package>
+
+List of required Python packages:
+--------------------------
+keras
+tensorflow
+readline - (optional) Unix Only
+pyaudio
+pyspeech
+SpeechRecognition
+
+
+2. Other packages/dependencies:
+npm (node.js from https://nodejs.org/en/)
