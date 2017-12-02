@@ -99,14 +99,14 @@ def firpm(inputfile, output="firpm_output.wav", plot=False):
 
     # Band-pass filter design parameters
     nyq         = sampleRate/2 # Nyquist sample rate, Hz
-    band        = [300, 3000]  # Desired pass band, Hz; recommended [300, 3000]
-    trans_width = 250          # Pass band transition, Hz; recommended 250
+    band        = [300, 1500]  # Desired pass band, Hz; recommended [300, 3000]
+    trans_width = 300          # Pass band transition, Hz; recommended 250
     numtaps     = 125          # Size of the FIR filter
 
     edges = [0, band[0] - trans_width,
              band[0], band[1],
              band[1] + trans_width, 0.5*nyq]
-    firpm = signal.remez(numtaps, edges, [0, 1, 0], Hz=nyq, type="bandpass")
+    firpm = signal.remez(numtaps, edges, [0.25, 1, 0.25], Hz=nyq, type="bandpass")
     output_signal = signal.lfilter(firpm, [1], input_signal)
 
     scaled = np.int16(output_signal/np.max(np.abs(output_signal)) * 32767)

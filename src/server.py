@@ -23,7 +23,7 @@ class MyServer():
         return self.modelWrapper.sample_and_predict()
 
 if __name__ == "__main__":
-    HOST = "69.91.136.134"
+    HOST = "192.168.1.2"
     PORT = 8080
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

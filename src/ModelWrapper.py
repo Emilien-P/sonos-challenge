@@ -1,5 +1,5 @@
 import src.Classifier as Cl
-import speechrec as sprec
+import src.speechrec as sprec
 from sklearn.metrics import accuracy_score, hamming_loss
 from keras import utils
 import numpy as np
@@ -16,7 +16,8 @@ class ModelWrapper():
     bootstrap = False
     train_labels = np.empty((1, 1))
 
-    def __init__(self, method="linSVM", bootstrap="1", dirpath="users_data/", trunk="100"):
+    def __init__(self, method="linSVM", bootstrap="1", dirpath="users_data/", trunk="50", delta=False):
+        self.delta = delta
         if method == "linSVM":
             self.model = Cl.MLClassifier()
         elif method == "seqNN":
@@ -32,13 +33,17 @@ class ModelWrapper():
             self.bootstrap = True
 
         self.dirpath = dirpath
-        number_feature = 12
-        self.train_data = np.empty((1, int(trunk), number_feature))
-        self.test_data = np.empty((1, int(trunk), number_feature))
+        if delta:
+            self.number_feature = 25
+        else:
+            self.number_feature = 12
+        self.train_data = np.empty((1, int(trunk), self.number_feature))
+        self.test_data = np.empty((1, int(trunk), self.number_feature))
         self.test_labels = np.empty((1, 1))
         self.trunk = int(trunk)
 
-    def calibrate(self, user_name, nb_calibrations="5", nb_tests="5", existing_samples=False):
+    def calibrate(self, user_name, nb_calibrations="5", existing_samples=False, nb_tests="0",
+                  noise_red=False, norm=False, downsample=0):
         '''
         Calibrate for a new user of the speaker recognition system
         :param user_name: The name of the user
@@ -63,9 +68,9 @@ class ModelWrapper():
 
         if not self.bootstrap:
             # Drop after trunk in the time domain as well as the first mel coef
-            user_calibration_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
-                                      [:trunk, 1:]) for i in range(nb_calibrations)]
-
+            user_calibration_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1),
+                                     delta=self.delta, noisereduction=noise_red, normalizemean=norm, downsample=downsample)[:trunk, 1:])
+                                     for i in range(nb_calibrations)]
             self.train_data = np.concatenate((self.train_data, np.asarray(user_calibration_data)), axis=0)
             self.train_labels = np.concatenate((self.train_labels, np.tile([self.nb_users - 1], (nb_calibrations, 1))))
 
@@ -84,9 +89,10 @@ class ModelWrapper():
                     (self.train_labels, np.tile([self.nb_users - 1], (nb_bootstrap, 1))))'''
 
             for i in range(nb_calibrations):
-                mfcc = (mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
-                        [:, 1:])
+                mfcc = (mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1),
+                                    delta=self.delta, normalizemean=norm, downsample=downsample)[:, 1:])
                 n_timedomain = mfcc.shape[0]
+                print(mfcc.shape)
                 nb_bootstrap = n_timedomain - self.trunk
                 step = 25
                 assert nb_bootstrap > 0
@@ -95,10 +101,13 @@ class ModelWrapper():
                 self.train_labels = np.concatenate(
                     (self.train_labels, np.tile([self.nb_users - 1], (np.arange(0, nb_bootstrap, step).shape[0], 1))))
 
+                print(self.train_labels)
+
         if(nb_tests > 0):
             # Drop after trunk in the time domain as well as the first mel coef
-            user_testing_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
-                                      [:trunk, 1:]) for i in range(nb_calibrations, nb_tests + nb_calibrations)]
+            user_testing_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1),
+                                              delta=self.delta, noisereduction=noise_red, normalizemean=norm)[:trunk, 1:])
+                                 for i in range(nb_calibrations, nb_tests + nb_calibrations)]
 
             self.test_data = np.concatenate((self.test_data, np.asarray(user_testing_data)), axis=0)
             self.test_labels = np.concatenate((self.test_labels, np.tile([self.nb_users - 1], (nb_tests, 1))))
@@ -110,7 +119,7 @@ class ModelWrapper():
         :return: None
         '''
         if isinstance(self.model, Cl.NNClassifier):
-            self.model.addAndCompile((self.trunk, 12, 1), self.nb_users)
+            self.model.addAndCompile((self.trunk, self.number_feature, 1), self.nb_users)
             #drop the first one which is a zero
             if val_data:
                 his = self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None,
@@ -127,6 +136,8 @@ class ModelWrapper():
                 self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None)
                 predictions = self.model.model.predict(self.test_data[1:].reshape(nb_tests, -1))
                 return accuracy_score(self.test_labels[1:], predictions), hamming_loss(self.test_labels[1:], predictions)
+            else: self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None)
+
 
     def sample_and_predict(self):
         '''
@@ -135,15 +146,14 @@ class ModelWrapper():
         '''
         return self.predict_from_audio(*sprec.get_audio())
 
-    def predict_from_file(self, file_name):
+    def predict_from_file(self, file_name, norm=False):
         '''
         Take a fileName, try to open it and returns the prediction of the wrapped model
         :param file_name: Name of the file to recognize
         :return: a json-formatted string of the prediction
         '''
 
-        #TODO: prepare data for CNN if needed, modulize those predict methods
-        pred_data = (mf.get_mfcc(self.dirpath+file_name)[:self.trunk, 1:])
+        pred_data = (mf.get_mfcc(self.dirpath+file_name, normalizemean=norm)[:self.trunk, 1:])
         prediction = self.model.predict(pred_data)
         prediction = self.users_map[int(prediction)]
 
@@ -157,8 +167,10 @@ class ModelWrapper():
         pred_data = mf.get_mfcc(self.dirpath+"sample_to_recognize.wav")[:self.trunk, 1:]
 
         prediction = self.model.predict(pred_data)
-        prediction = self.users_map[prediction]
-
+        if isinstance(self.model, Cl.NNClassifier):
+            prediction = self.users_map[prediction]
+        else:
+            prediction = self.users_map[prediction[0]]
         answ = {"user_prediction" : prediction,
                 "google_sentence_prediction" : google_pred}
 

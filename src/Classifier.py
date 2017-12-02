@@ -168,6 +168,7 @@ class NNClassifier(SpeakerClassifier):
               metrics=['accuracy'])
 
         self.compiled = True
+        #utils.plot_model(self.model, to_file=("results/model_" + self.method +"_architecture.png"))
 
     def fit(self, x, y, sample_weight=None, num_class=None, val_split=0, val_data=None):
         assert self.compiled
@@ -183,7 +184,7 @@ class NNClassifier(SpeakerClassifier):
             if val_data:
                 val_data = (val_data[0][:, :, :, np.newaxis], val_data[1])
         self.history = self.model.fit(x, y, sample_weight, validation_split=val_split, validation_data=val_data,
-                                      epochs=10) # callbacks=[EarlyStopping(monitor='val_loss')]
+                                      epochs=20) # callbacks=[EarlyStopping(monitor='val_loss')]
         return self.history
 
     def predict(self, x):

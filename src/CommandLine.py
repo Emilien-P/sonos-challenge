@@ -21,6 +21,7 @@ class sonosShell(cmd.Cmd):
 
     def do_predict(self, arg):
         name, command = self.modelWrapper.sample_and_predict()
+        print(name)
 
 
 

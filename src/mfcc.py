@@ -16,7 +16,7 @@ def usage():
 
 	print(msg)
 
-def get_mfcc(filename, delta=False, noisereduction=True, normalizemean=False, numcoeff=13, verbose=False):
+def get_mfcc(filename, delta=False, noisereduction=False, normalizemean=False, numcoeff=13, verbose=False):
 
 	def print_if(string, verb):
 		if verb:

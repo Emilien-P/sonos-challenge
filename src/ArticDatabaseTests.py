@@ -1,18 +1,18 @@
 import numpy as np
-from src import mfcc as mf
-from sklearn.model_selection import cross_validate
-from src.Classifier import MLClassifier, NNClassifier
 import src.ModelWrapper as MW
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def accuracyTest(method, bootstrap, n_samples, n_tests=0, nb_speakers=4, delta=False, norm=False, return_pair=False):
+def accuracyTest(method, bootstrap, n_samples, n_tests=0, nb_speakers=4, delta=False, norm=False,
+                 downsample=0,
+                 return_pair=False):
     mw = MW.ModelWrapper(method, bootstrap, "../resources/", delta=delta)
 
     speakers_id = ["awb", "clb", "rms", "slt", "bdl", "jmk", "ksp"]
     for idx in range(nb_speakers):
         id = speakers_id[idx]
-        mw.calibrate("cmu_us_"+id+"_arctic/wav/arctic_a", n_samples, n_tests, True, norm=norm)
+        mw.calibrate("cmu_us_"+id+"_arctic/wav/arctic_a", n_samples, True,
+                     nb_tests=n_tests, norm=norm, downsample=downsample)
 
     if method in ["CNN", "seqNN", "LSTM"]:
         hist = mw.compile_model(val_data=(n_tests != 0))
@@ -25,9 +25,9 @@ def accuracyTest(method, bootstrap, n_samples, n_tests=0, nb_speakers=4, delta=F
         return mw.compile_model(val_data=(n_tests != 0))
 
 def accuracyTestNoise(method, bootstrap, n_samples, n_tests=0, nb_speakers=4, delta=False, noise_red=False):
-    mw = MW.ModelWrapper(method, bootstrap, "../resources/", delta=delta)
-    mw.calibrate("cmu_us_" + "bdl" + "_sin/wav/arctic_a", n_samples, n_tests, True, noise_red=noise_red)
-    mw.calibrate("cmu_us_" + "jmk" + "_arctic/wav/arctic_a", n_samples, n_tests, True, noise_red=noise_red)
+    mw = MW.ModelWrapper(method, bootstrap, "../resources/15dB/", delta=delta)
+    mw.calibrate("sp", n_samples, True, n_tests, noise_red=noise_red)
+    mw.calibrate("ss", n_samples,  True, n_tests,noise_red=noise_red)
 
     if method in ["CNN", "seqNN", "LSTM"]:
         hist = mw.compile_model(val_data=(n_tests != 0))
@@ -137,23 +137,30 @@ def withVsWithoutDelta():
     sns.set()
     plt.figure()
     clrs = sns.color_palette("husl", 5)
-    method_set = ["linSVM", "seqNN", "CNN", "LSTM"]
-    x = np.arange(6, 13, 1)
-    y_with = np.zeros((len(method_set), *x.shape))
+    method_set = ["LSTM", "CNN"]
+    x = np.arange(1, 25, 2)
+    y_with_lower = np.zeros((len(method_set), *x.shape))
+    y_with_middle = np.zeros((len(method_set), *x.shape))
+    y_with_upper = np.zeros((len(method_set), *x.shape))
     y_without = np.zeros((len(method_set), *x.shape))
 
     for i, method in enumerate(method_set):
         for idx, n_samples in enumerate(x):
-            y_with[i, idx], _ = accuracyTest(method, "1", n_samples, n_tests=50, delta=True, nb_speakers=7)
+            acc = np.sort([accuracyTest(method, "1", n_samples=10, n_tests=50)[0],
+                           accuracyTest(method, "1", n_samples=10, n_tests=50)[0],
+                           accuracyTest(method, "1", n_samples=10, n_tests=50)[0]])
+            y_with_lower[i, idx] = acc[0]
+            y_with_middle[i, idx] = acc[1]
+            y_with_upper[i, idx] = acc[2]
 
-        p1 = plt.plot(x, y_with[i], c=clrs[i], label=method)
+        p1 = plt.plot(x, y_with_middle[i], c=clrs[i], label=method)
+        plt.fill_between(x, y_with_upper[i], y_with_lower[i], color=clrs[i], alpha=0.5)
 
         for idx, n_samples in enumerate(x):
-            y_without[i, idx], _ = accuracyTest(method, "1", n_samples, n_tests=50, delta=False, nb_speakers=7)
+            y_without[i, idx], _ = accuracyTest(method, "1", n_samples, n_tests=50, delta=False)
         p2 = plt.plot(x, y_without[i], linestyle='--', c=clrs[i])
 
 
-    np.savetxt("results/withDelta.txt", y_with)
     np.savetxt("results/withoutDelta.txt", y_without)
     plt.legend()
     plt.xlabel("number of samples")
@@ -224,22 +231,29 @@ def withVsWithoutNoiseReduction():
     plt.figure()
     clrs = sns.color_palette("husl", 5)
     method_set = ["CNN", "LSTM"]
-    x = np.arange(6, 11, 1)
-    y_with = np.zeros((len(method_set), *x.shape))
+    x = np.arange(1, 6, 1)
+    y_with_lower = np.zeros((len(method_set), *x.shape))
+    y_with_middle = np.zeros((len(method_set), *x.shape))
+    y_with_upper = np.zeros((len(method_set), *x.shape))
+
     y_without = np.zeros((len(method_set), *x.shape))
 
     for i, method in enumerate(method_set):
         for idx, n_samples in enumerate(x):
-            y_with[i, idx], _ = accuracyTestNoise(method, "1", n_samples, n_tests=10, delta=True, noise_red=True)
+            acc = np.sort([accuracyTestNoise(method, "1", n_samples, n_tests=5, noise_red=True)[0],
+                           accuracyTestNoise(method, "1", n_samples,  n_tests=5, noise_red=True)[0],
+                           accuracyTestNoise(method, "1", n_samples, n_tests=5, noise_red=True)[0]])
+            y_with_lower[i, idx] = acc[0]
+            y_with_middle[i, idx] = acc[1]
+            y_with_upper[i, idx] = acc[2]
 
-        p1 = plt.plot(x, y_with[i], c=clrs[i], label=method)
+        p1 = plt.plot(x, y_with_middle[i], c=clrs[i], label=method)
+        plt.fill_between(x, y_with_upper[i], y_with_lower[i], color=clrs[i], alpha=0.5)
 
         for idx, n_samples in enumerate(x):
-            y_without[i, idx], _ = accuracyTestNoise(method, "1", n_samples, n_tests=10, delta=True, noise_red=False)
+            y_without[i, idx], _ = accuracyTestNoise(method, "1", n_samples, n_tests=5, noise_red=False)
         p2 = plt.plot(x, y_without[i], linestyle='--', c=clrs[i])
 
-
-    np.savetxt("results/withNoiseReduction.txt", y_with)
     np.savetxt("results/withoutNoiseReduction.txt", y_without)
     plt.legend()
     plt.xlabel("number of samples")
@@ -279,7 +293,43 @@ def withVsWithoutNormalization():
 
     plt.show()
 
+def withVsWithoutDownsampling():
+    sns.set()
+    plt.figure()
+    clrs = sns.color_palette("husl", 5)
+    method_set = ["LSTM", "CNN"]
+    x = np.arange(1, 25, 2)
+    y_with_lower = np.zeros((len(method_set), *x.shape))
+    y_with_middle = np.zeros((len(method_set), *x.shape))
+    y_with_upper = np.zeros((len(method_set), *x.shape))
+    y_without = np.zeros((len(method_set), *x.shape))
+
+    for i, method in enumerate(method_set):
+        for idx, n_samples in enumerate(x):
+            acc = np.sort([accuracyTest(method, "1", n_samples=10, n_tests=50)[0],
+                           accuracyTest(method, "1", n_samples=10, n_tests=50)[0],
+                           accuracyTest(method, "1", n_samples=10, n_tests=50)[0]])
+            y_with_lower[i, idx] = acc[0]
+            y_with_middle[i, idx] = acc[1]
+            y_with_upper[i, idx] = acc[2]
+
+        p1 = plt.plot(x, y_with_middle[i], c=clrs[i], label=method)
+        plt.fill_between(x, y_with_upper[i], y_with_lower[i], color=clrs[i], alpha=0.5)
+
+        for idx, n_samples in enumerate(x):
+            y_without[i, idx], _ = accuracyTest(method, "1", n_samples, n_tests=50, delta=False)
+        p2 = plt.plot(x, y_without[i], linestyle='--', c=clrs[i])
+
+
+    np.savetxt("results/withoutDelta.txt", y_without)
+    plt.legend()
+    plt.xlabel("number of samples")
+    plt.ylabel("maximal accuracy over 10 epochs")
+
+    plt.title("Accuracy of the models with and without delta MFCC features")
+
+    plt.show()
 
 
 if __name__ == "__main__":
-   extensiveModelTesting()
+    withVsWithoutDownsampling()
