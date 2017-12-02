@@ -6,6 +6,7 @@ import speechpy, sys
 import scipy.io.wavfile as wav
 from noisereduction import reduce_noise
 import matplotlib.pyplot as plt
+import audioop, wave
 
 div = '='*70 + '\n'
 
@@ -16,8 +17,54 @@ def usage():
 
 	print(msg)
 
-def get_mfcc(filename, delta=False, noisereduction=False, normalizemean=False, numcoeff=13, verbose=False):
+def resample(filename, factor, inchannels=1, outchannels=1):
 
+	""" Resamples a WAV file to specified rate """
+
+	inrate, signal = wav.read(filename)
+
+	outrate = round(inrate/float(factor))
+
+	print('\nDownsampling ' + str(inrate) + ' to ' + str(outrate))
+
+	if inrate < outrate:
+		print("Invalid inrate and outrate: "+ str(inrate) + ', ' + str(outrate))
+		quit()
+
+	s_read  = wave.open(filename, 'r')
+	s_write = wave.open("resampled.wav", 'w')
+
+	n_frames = s_read.getnframes()
+	data     = s_read.readframes(n_frames)
+
+	try:
+		converted = audioop.ratecv(data, 2, inchannels, inrate, outrate, None)
+		if outchannels == 1:
+			converted = audioop.tomono(converted[0], 2, 1, 0)
+	except:
+		print('Failed to downsample wav')
+		return False
+
+	try:
+		s_write.setparams((outchannels, 2, outrate, 0, 'NONE', 'Uncompressed'))
+		s_write.writeframes(converted)
+	except:
+		print('Failed to write wav')
+		return False
+
+	s_read.close()
+	s_write.close()
+
+	return True
+
+
+def get_mfcc(filename, 
+			 downsample     = 0,
+	         delta          = False, 
+             noisereduction = True, 
+             normalizemean  = False, 
+             numcoeff       = 13, 
+             verbose        = False):
 	def print_if(string, verb):
 		if verb:
 			print(string)
@@ -30,6 +77,13 @@ def get_mfcc(filename, delta=False, noisereduction=False, normalizemean=False, n
 		verbose:        enable detailed print statements
 
 	"""
+	# Perform downsampling and creates another downsampled wav file if specified
+	if downsample > 0:
+		print_if('Downsampling On by factor of ' + str(downsample), verbose)
+		resample(filename, downsample)
+		filename = "resampled.wav"
+	else:
+		print_if('Downsampling Off', verbose)
 
 	# Perform noise reduction before calculating coefficients
 	if noisereduction:
@@ -167,6 +221,7 @@ if __name__=="__main__":
 
 	filename = sys.argv[1]
 
+	#downsample(filename)
 	get_mfcc(filename, delta=True, verbose=True)
 	# get_mfe(filename)
 	# get_fft(filename)
