@@ -8,6 +8,9 @@ def parse(arg):
     return tuple(arg.split())
 
 class MyServer():
+    '''
+    Very basic server to connect to the java frontend
+    '''
     def __init__(self, arg=()):
         self.modelWrapper = MW.ModelWrapper(*arg)
         self.initialized = True

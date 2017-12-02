@@ -3,9 +3,14 @@ import src.ModelWrapper as MW
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def accuracyTest(method, bootstrap, n_samples, n_tests=0, nb_speakers=4, delta=False, norm=False,
-                 downsample=0,
-                 return_pair=False):
+def accuracyTest(method,
+                 bootstrap,
+                 n_samples,
+                 n_tests=0,
+                 nb_speakers=4,
+                 delta=False,
+                 norm=False,
+                 downsample=0):
     mw = MW.ModelWrapper(method, bootstrap, "../resources/", delta=delta)
 
     speakers_id = ["awb", "clb", "rms", "slt", "bdl", "jmk", "ksp"]
@@ -24,7 +29,12 @@ def accuracyTest(method, bootstrap, n_samples, n_tests=0, nb_speakers=4, delta=F
     else:
         return mw.compile_model(val_data=(n_tests != 0))
 
-def accuracyTestNoise(method, bootstrap, n_samples, n_tests=0, nb_speakers=4, delta=False, noise_red=False):
+def accuracyTestNoise(method,
+                      bootstrap,
+                      n_samples,
+                      n_tests=0,
+                      delta=False,
+                      noise_red=False):
     mw = MW.ModelWrapper(method, bootstrap, "../resources/15dB/", delta=delta)
     mw.calibrate("sp", n_samples, True, n_tests, noise_red=noise_red)
     mw.calibrate("ss", n_samples,  True, n_tests,noise_red=noise_red)

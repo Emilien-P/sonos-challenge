@@ -50,6 +50,11 @@ class ModelWrapper():
         :param nb_calibrations: Number of calibration samples
         :param dirpath: path where to store the user data
         :param trunk: where to cut in the mel freq time domain
+        :param noise_red: bool to trigger the noise reduction
+        :param norm: Normalize th input samples
+        :param existing_samples: bool to indicate whether the samples already exists
+        :param nb_tests: number of samples to use for testing
+        :param downsample: int factor to downsample the input
         :return: None
         '''
 
@@ -62,32 +67,21 @@ class ModelWrapper():
         trunk = self.trunk
 
         if existing_samples == "0":
-            print("Recording the calibration samples")
             for i in range(nb_calibrations):
                 sprec.get_one_sample(self.dirpath+user_name.lower()+"{:0>4}.wav".format(i + 1))
 
         if not self.bootstrap:
             # Drop after trunk in the time domain as well as the first mel coef
             user_calibration_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1),
-                                     delta=self.delta, noisereduction=noise_red, normalizemean=norm, downsample=downsample)[:trunk, 1:])
-                                     for i in range(nb_calibrations)]
+                                      delta=self.delta,
+                                      noisereduction=noise_red,
+                                      normalizemean=norm,
+                                      downsample=downsample)[:trunk, 1:])
+                                      for i in range(nb_calibrations)]
             self.train_data = np.concatenate((self.train_data, np.asarray(user_calibration_data)), axis=0)
             self.train_labels = np.concatenate((self.train_labels, np.tile([self.nb_users - 1], (nb_calibrations, 1))))
 
         else:
-            print("Bootstrapping")
-            '''for i in range(nb_calibrations):
-                mfcc = (mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1))
-                                      [:, 1:])
-                n_timedomain = mfcc.shape[0]
-                nb_bootstrap = n_timedomain - self.trunk
-                assert nb_bootstrap > 0
-                #TODO: TRY A NEW WAY OF BOOTSTRAPPING
-                cal_data = [mfcc[j: j+self.trunk] for j in range(nb_bootstrap)]
-                self.train_data = np.concatenate((self.train_data, np.asarray(cal_data)), axis=0)
-                self.train_labels = np.concatenate(
-                    (self.train_labels, np.tile([self.nb_users - 1], (nb_bootstrap, 1))))'''
-
             for i in range(nb_calibrations):
                 mfcc = (mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1),
                                     delta=self.delta, normalizemean=norm, downsample=downsample)[:, 1:])
@@ -106,7 +100,9 @@ class ModelWrapper():
         if(nb_tests > 0):
             # Drop after trunk in the time domain as well as the first mel coef
             user_testing_data = [(mf.get_mfcc(self.dirpath + user_name.lower() + "{:0>4}.wav".format(i + 1),
-                                              delta=self.delta, noisereduction=noise_red, normalizemean=norm)[:trunk, 1:])
+                                              delta=self.delta,
+                                              noisereduction=noise_red,
+                                              normalizemean=norm)[:trunk, 1:])
                                  for i in range(nb_calibrations, nb_tests + nb_calibrations)]
 
             self.test_data = np.concatenate((self.test_data, np.asarray(user_testing_data)), axis=0)
@@ -123,9 +119,10 @@ class ModelWrapper():
             #drop the first one which is a zero
             if val_data:
                 his = self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None,
-                                     num_class=self.nb_users, val_split=val_split,
+                                     num_class=self.nb_users,
+                                     val_split=val_split,
                                      val_data=(self.test_data[1:],
-                                               utils.to_categorical(self.test_labels[1:], num_classes=self.nb_users)))
+                                     utils.to_categorical(self.test_labels[1:], num_classes=self.nb_users)))
             else:
                 his = self.model.fit(self.train_data[1:], self.train_labels[1:], sample_weight=None,
                                      num_class=self.nb_users, val_split=val_split)
