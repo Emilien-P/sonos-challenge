@@ -1,1 +1,1 @@
-refer to javadoc in src/Main.java
+Server app (see sonos_ppt for functionality diagram)

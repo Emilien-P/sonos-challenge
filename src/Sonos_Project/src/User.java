@@ -15,7 +15,12 @@ public class User {
 	}
 	
 	public void addGenre(String g) {
-		favoriteGenres.add(g);
+		if(g.equals("chill_pop")) {
+			favoriteGenres.add("POP");
+		}
+		else {
+			favoriteGenres.add(g.toUpperCase());
+		}
 	}
 	public int getId() {
 		return userId;
